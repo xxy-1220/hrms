@@ -1,0 +1,76 @@
+{% load static %}<!DOCTYPE html>
+<html lang="zh-hans">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>登录 · 企业员工管理系统</title>
+    <link rel="stylesheet" href="{% static 'vendor/bootstrap/css/bootstrap.min.css' %}">
+    <link rel="stylesheet" href="{% static 'css/site.css' %}">
+</head>
+<body>
+<!--
+  ================================================================
+  页面：login.html —— 登录页
+  对应任务书：T4 用户登录（用户名 + 密码 + 图片验证码，含错误提示与跳转）
+  注意：本页不继承 base.html，因为还没登录时不需要顶部导航和左侧菜单。
+  讲解要点（演示时照这个顺序讲）：
+   1. 浏览器里是一张居中的白色登录卡片：用户名、密码、验证码三行输入框，最下面是通栏蓝色「登 录」按钮。
+   2. 先故意留空或输错密码提交：卡片顶部出现红色错误框，对应输入框边框变红并出现红字提示。
+   3. 指验证码：右边是一张后端生成的图片，点一下会换一张（防止机器人暴力登录）。
+   4. 演示正确登录：admin / admin123456 → 跳转首页概览；若之前访问的是别的页面，会跳回那个页面（地址栏 next 参数）。
+-->
+<div class="login-page">
+    <div class="login-card">
+        <h2>企业员工管理系统</h2>
+        <div class="login-sub">HRMS · 请使用您的账号登录</div>
+
+        {% if form.non_field_errors %}
+        <div class="alert alert-danger">
+            {% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}
+        </div>
+        {% endif %}
+
+        <form method="post" action="{% url 'login' %}" novalidate>
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ next }}">
+
+            <div class="form-group {% if form.username.errors %}has-error{% endif %}">
+                <label for="{{ form.username.id_for_label }}">用户名</label>
+                {{ form.username }}
+                {% for error in form.username.errors %}<span class="help-block">{{ error }}</span>{% endfor %}
+            </div>
+
+            <div class="form-group {% if form.password.errors %}has-error{% endif %}">
+                <label for="{{ form.password.id_for_label }}">密码</label>
+                {{ form.password }}
+                {% for error in form.password.errors %}<span class="help-block">{{ error }}</span>{% endfor %}
+            </div>
+
+            <div class="form-group {% if form.captcha.errors %}has-error{% endif %}">
+                <label for="{{ form.captcha.id_for_label }}">验证码</label>
+                <div class="captcha-row">
+                    {{ form.captcha }}
+                    <img id="captchaImage" class="captcha-img" src="{% url 'captcha' %}"
+                         alt="图片验证码" title="点击刷新验证码">
+                </div>
+                <span class="help-block">看不清？点击图片刷新</span>
+                {% for error in form.captcha.errors %}<span class="help-block field-error">{{ error }}</span>{% endfor %}
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block">登 录</button>
+        </form>
+
+        <div class="login-footer">© 2026 HRMS · 课程设计项目</div>
+    </div>
+</div>
+
+<script src="{% static 'vendor/jquery/jquery.min.js' %}"></script>
+<script>
+    $('#captchaImage').on('click', function () {
+        var baseUrl = "{% url 'captcha' %}";
+        this.src = baseUrl + '?t=' + new Date().getTime();
+    });
+</script>
+</body>
+</html>

@@ -1,0 +1,35 @@
+{% extends 'app01/base.html' %}
+<!--
+  ================================================================
+  页面：salary_form.html —— 薪资新增 / 编辑表单
+  对应任务书：T7 薪资管理
+  讲解要点（演示时照这个顺序讲）：
+   1. 浏览器里是一张表单卡片：选择员工、月份、基本工资、奖金、扣款等，下面保存/取消。
+   2. 月份输入框格式是 YYYY-MM（如 2026-11），同一员工同一月份只允许一条记录。
+   3. 不用自己算实发工资：填好三项后保存，后端自动算「基本 + 奖金 - 扣款」并写进实发字段。
+   4. 只填基本工资直接保存，列表里实发工资就等于基本工资，奖金扣款按 0 处理。
+-->
+{% block title %}{{ title }} · 企业员工管理系统{% endblock %}
+
+{% block content %}
+<div class="page-header-box">
+    <div>
+        <h3>{{ title }}</h3>
+        <div class="sub">月份格式 YYYY-MM，实发工资保存时自动计算</div>
+    </div>
+    <a href="{% url 'salary_list' %}" class="btn btn-default">
+        <span class="glyphicon glyphicon-arrow-left"></span> 返回列表
+    </a>
+</div>
+
+<div class="panel-card form-panel">
+    <form method="post" novalidate>
+        {% csrf_token %}
+        {% include 'includes/form_fields.html' %}
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">保存</button>
+            <a href="{% url 'salary_list' %}" class="btn btn-default">取消</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

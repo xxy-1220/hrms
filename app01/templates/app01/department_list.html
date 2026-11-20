@@ -1,0 +1,84 @@
+{% extends 'app01/base.html' %}
+{% load rbac %}
+<!--
+  ================================================================
+  页面：department_list.html —— 部门管理列表
+  对应任务书：T2 部门管理（列表 / 搜索 / 新增 / 编辑 / 删除 / 分页）
+  讲解要点（演示时照这个顺序讲）：
+   1. 浏览器里上方左边是标题「部门管理」，右上角是蓝色「新增部门」按钮；下面一行是搜索框 + 查询按钮。
+   2. 再往下是表格：编号、部门名称、描述、员工人数、创建时间、操作；每行右侧有「编辑」「删除」小按钮。
+   3. 换 staff01 登录：右上角「新增部门」消失、行内也没有编辑/删除按钮——这些都由 has_perm_code 权限标签控制显示。
+   4. 点「删除」先弹浏览器确认框，点确定才提交；表格下方是分页条；导航和左侧菜单来自父模板 base.html，本页只填 content 插槽。
+-->
+
+{% block title %}部门管理 · 企业员工管理系统{% endblock %}
+
+{% block content %}
+<div class="page-header-box">
+    <div>
+        <h3>部门管理</h3>
+        <div class="sub">维护企业组织架构，部门下存在员工时不可删除</div>
+    </div>
+    {% has_perm_code request.user 'department:add' as can_add %}
+    {% if can_add %}
+    <a href="{% url 'department_add' %}" class="btn btn-primary">
+        <span class="glyphicon glyphicon-plus"></span> 新增部门
+    </a>
+    {% endif %}
+</div>
+
+<form method="get" class="filter-bar form-inline">
+    <div class="form-group">
+        <input type="text" name="q" value="{{ keyword }}" class="form-control" placeholder="按部门名称搜索">
+    </div>
+    <button type="submit" class="btn btn-default">
+        <span class="glyphicon glyphicon-search"></span> 查询
+    </button>
+    {% if keyword %}
+    <a href="{% url 'department_list' %}" class="btn btn-link">重置</a>
+    {% endif %}
+</form>
+
+<div class="table-panel">
+    <table class="table table-hover">
+        <thead>
+        <tr>
+            <th style="width: 70px;">编号</th>
+            <th>部门名称</th>
+            <th>部门描述</th>
+            <th style="width: 110px;">员工人数</th>
+            <th style="width: 170px;">创建时间</th>
+            <th style="width: 190px;">操作</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for dept in page_obj %}
+        <tr>
+            <td>{{ dept.id }}</td>
+            <td><strong>{{ dept.title }}</strong></td>
+            <td class="text-muted">{{ dept.description|default:'—'|truncatechars:40 }}</td>
+            <td>{{ dept.employee_count }} 人</td>
+            <td class="text-muted">{{ dept.created_at|date:'Y-m-d H:i' }}</td>
+            <td>
+                {% has_perm_code request.user 'department:edit' as can_edit %}
+                {% if can_edit %}
+                <a href="{% url 'department_edit' dept.id %}" class="btn btn-default btn-action">编辑</a>
+                {% endif %}
+                {% has_perm_code request.user 'department:delete' as can_delete %}
+                {% if can_delete %}
+                <form method="post" action="{% url 'department_delete' dept.id %}" class="inline-form"
+                      onsubmit="return confirm('确认删除部门「{{ dept.title }}」吗？');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger btn-action">删除</button>
+                </form>
+                {% endif %}
+            </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6"><div class="empty-state">暂无部门数据</div></td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% include 'includes/pagination.html' %}
+</div>
+{% endblock %}

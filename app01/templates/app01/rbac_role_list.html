@@ -1,0 +1,67 @@
+{% extends 'app01/base.html' %}
+<!--
+  ================================================================
+  页面：rbac_role_list.html —— 角色权限列表
+  对应任务书：T5 RBAC 权限管理（角色与权限的多对多关系）
+  讲解要点（演示时照这个顺序讲）：
+   1. 浏览器里是一张角色表格：ID、角色名称、角色编码、描述、权限数量、使用人数、操作。
+   2. 三个内置角色（超级管理员、部门管理员、普通员工）都在这里；「权限数量」表示这个角色打包了多少个权限。
+   3. 点行尾「编辑权限」进入勾选页，可以增减这个角色拥有的权限；删除前会弹确认框。
+   4. 页面最下方蓝色提示条说明内置角色不能删、已分配的要先解除；角色少，本页直接列出全部，没有分页。
+-->
+
+{% block title %}角色权限 · 企业员工管理系统{% endblock %}
+
+{% block content %}
+<div class="page-header-box">
+    <div>
+        <h3>角色权限</h3>
+        <div class="sub">维护角色与权限的多对多关系，用户通过角色获得权限</div>
+    </div>
+    <a href="{% url 'rbac_role_add' %}" class="btn btn-primary">
+        <span class="glyphicon glyphicon-plus"></span> 新增角色
+    </a>
+</div>
+
+<div class="table-panel">
+    <table class="table table-hover">
+        <thead>
+        <tr>
+            <th style="width: 60px;">ID</th>
+            <th>角色名称</th>
+            <th>角色编码</th>
+            <th>角色描述</th>
+            <th style="width: 100px;">权限数量</th>
+            <th style="width: 100px;">使用人数</th>
+            <th style="width: 180px;">操作</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for role in roles %}
+        <tr>
+            <td>{{ role.id }}</td>
+            <td><strong>{{ role.name }}</strong></td>
+            <td><code>{{ role.code }}</code></td>
+            <td class="text-muted">{{ role.description|default:'—' }}</td>
+            <td>{{ role.permissions.all|length }} 项</td>
+            <td>{{ role.user_count }} 人</td>
+            <td>
+                <a href="{% url 'rbac_role_edit' role.id %}" class="btn btn-default btn-action">编辑权限</a>
+                <form method="post" action="{% url 'rbac_role_delete' role.id %}" class="inline-form"
+                      onsubmit="return confirm('确认删除角色「{{ role.name }}」吗？');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger btn-action">删除</button>
+                </form>
+            </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7"><div class="empty-state">暂无角色</div></td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="alert alert-info" style="margin-top: 16px;">
+    提示：超级管理员、部门管理员、普通员工为系统内置角色，不允许删除；已分配给用户的角色需先解除分配才能删除。
+</div>
+{% endblock %}

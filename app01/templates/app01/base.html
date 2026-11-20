@@ -1,0 +1,538 @@
+{% load static rbac %}<!DOCTYPE html>
+<html lang="zh-hans">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="referrer" content="same-origin">
+    <!--
+      ================================================================
+      页面：base.html —— 全站公共布局（母版页 / 父模板）
+      对应任务书：T4 用户登录与权限 + T5 RBAC 权限控制（导航按权限显示）
+      作用：所有业务页面都通过 extends 继承本页，只填本页留出的 block；
+            本页统一负责顶部导航、左侧菜单、消息提示、引入 jQuery/Bootstrap。
+      讲解要点（演示时照这个顺序讲）：
+       1. 先指浏览器最上方深色导航条：左边 EMS 点一下回首页；右边头像下拉能看当前账号和角色，
+          展开后有「Django 后台」（仅管理员可见）和「退出登录」。
+       2. 再指左侧灰色菜单：换账号登录后菜单条数不一样（admin 全都有，staff01 只剩只读的几项），
+          这就是权限控制的效果——没权限的菜单直接不渲染。
+       3. 最后指中间大片空白区：各部门/员工/考勤页面的表格和表单都显示在这里，
+          因为子页面把内容填进了 content 这个 block。
+       4. 页面底部只在这里引入一次 jQuery 和 Bootstrap；子页面要额外脚本就写进 extra_js 插槽。
+    -->
+    <title>{% block title %}企业员工管理系统{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'vendor/bootstrap/css/bootstrap.min.css' %}">
+    <link rel="stylesheet" href="{% static 'css/site.css' %}">
+    {% block extra_css %}{% endblock %}
+    <style>
+        /* ========== AI 悬浮球 ========== */
+        .ai-fab {
+            position: fixed;
+            right: 24px;
+            bottom: 120px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: #fff;
+            text-align: center;
+            line-height: 56px;
+            font-size: 26px;
+            cursor: pointer;
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+            z-index: 9999;
+            transition: transform 0.2s;
+            user-select: none;
+        }
+        .ai-fab:hover { transform: scale(1.08); }
+        .ai-fab::before {
+            content: '';
+            position: absolute;
+            width: 100%; height: 100%;
+            border-radius: 50%;
+            border: 2px solid #667eea;
+            animation: aiPulse 1.8s infinite;
+            box-sizing: border-box;
+        }
+        @keyframes aiPulse {
+            0% { transform: scale(1); opacity: 0.6; }
+            100% { transform: scale(1.6); opacity: 0; }
+        }
+        .ai-panel {
+            position: fixed;
+            right: 24px;
+            bottom: 190px;
+            width: 380px;
+            height: 500px;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+            z-index: 9999;
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .ai-panel.open { display: flex; }
+        .ai-panel-header {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: #fff;
+            padding: 12px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: bold;
+        }
+        .ai-panel-header .ai-close {
+            cursor: pointer;
+            opacity: 0.85;
+            font-size: 18px;
+        }
+        .ai-panel-body {
+            flex: 1;
+            padding: 12px;
+            overflow-y: auto;
+            background: #f7f8fc;
+        }
+        .ai-msg { margin-bottom: 10px; display: flex; }
+        .ai-msg .ai-bubble {
+            max-width: 80%;
+            padding: 8px 12px;
+            border-radius: 12px;
+            white-space: pre-wrap;
+            word-break: break-word;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        .ai-msg.user { justify-content: flex-end; }
+        .ai-msg.user .ai-bubble {
+            background: #667eea;
+            color: #fff;
+            border-bottom-right-radius: 4px;
+        }
+        .ai-msg.ai .ai-bubble {
+            background: #fff;
+            color: #333;
+            border-bottom-left-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+        .ai-msg .ai-avatar {
+            width: 28px; height: 28px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 14px; color: #fff; flex-shrink: 0;
+            margin: 0 6px;
+        }
+        .ai-msg.user .ai-avatar { background: #667eea; order: 2; }
+        .ai-msg.ai .ai-avatar { background: #764ba2; }
+        .ai-panel-footer {
+            padding: 10px;
+            border-top: 1px solid #eee;
+            display: flex;
+            gap: 6px;
+            align-items: flex-end;
+        }
+        .ai-panel-footer textarea {
+            flex: 1;
+            resize: none;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            padding: 8px;
+            font-size: 14px;
+            outline: none;
+        }
+        .ai-panel-footer textarea:focus { border-color: #667eea; }
+        .ai-send-btn {
+            padding: 8px 16px;
+            background: #667eea;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .ai-send-btn:hover { background: #5a6fd6; }
+        .ai-send-btn:disabled { background: #bbb; cursor: not-allowed; }
+        .ai-reset-btn {
+            padding: 6px 10px;
+            background: transparent;
+            color: #e74c3c;
+            border: 1px solid #e74c3c;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .ai-reset-btn:hover { background: #fdf0f0; }
+        .ai-typing { display: inline-block; }
+        .ai-typing span {
+            display: inline-block;
+            width: 6px; height: 6px;
+            background: #bbb; border-radius: 50%;
+            margin: 0 2px;
+            animation: aiDot 1.2s infinite;
+        }
+        .ai-typing span:nth-child(2) { animation-delay: 0.2s; }
+        .ai-typing span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes aiDot {
+            0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+            40% { transform: scale(1); opacity: 1; }
+        }
+        /* 登录页不显示悬浮球 */
+        .login-page .ai-fab, .login-page .ai-panel { display: none !important; }
+    </style>
+</head>
+<body>
+<nav class="navbar navbar-inverse navbar-fixed-top site-navbar">
+    <div class="container-fluid">
+        <div class="navbar-header">
+            <a class="navbar-brand" href="{% url 'dashboard' %}">
+                <span class="brand-mark">EMS</span> 企业员工管理系统
+            </a>
+        </div>
+        <ul class="nav navbar-nav navbar-right">
+            <li class="dropdown">
+                <a href="#" class="dropdown-toggle user-menu" data-toggle="dropdown">
+                    <span class="avatar-mini">{{ request.user.username|slice:':1'|upper }}</span>
+                    {{ request.user.get_full_name|default:request.user.username }}
+                    <span class="caret"></span>
+                </a>
+                <ul class="dropdown-menu">
+                    <li class="dropdown-header">
+                        {% if request.user.is_super_admin or request.user.is_superuser %}超级管理员{% else %}
+                        {% for role in request.user.roles.all %}{{ role.name }}{% if not forloop.last %} / {% endif %}{% empty %}普通员工{% endfor %}
+                        {% endif %}
+                    </li>
+                    <li class="divider"></li>
+                    {% if request.user.is_staff %}
+                    <li><a href="/admin/" target="_blank">Django 后台</a></li>
+                    {% endif %}
+                    <li><a href="{% url 'logout' %}">退出登录</a></li>
+                </ul>
+            </li>
+        </ul>
+    </div>
+</nav>
+
+<div class="site-layout">
+    <aside class="site-sidebar">
+        <ul class="sidebar-nav">
+            <li class="{% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+                <a href="{% url 'dashboard' %}"><span class="glyphicon glyphicon-dashboard"></span> 首页概览</a>
+            </li>
+            {% has_perm_code request.user 'department:view' as can_department %}
+            {% if can_department %}
+            <li class="{% if 'department' in request.resolver_match.url_name %}active{% endif %}">
+                <a href="{% url 'department_list' %}"><span class="glyphicon glyphicon-th-large"></span> 部门管理</a>
+            </li>
+            {% endif %}
+            {% has_perm_code request.user 'employee:view' as can_employee %}
+            {% if can_employee %}
+            <li class="{% if 'employee' in request.resolver_match.url_name %}active{% endif %}">
+                <a href="{% url 'employee_list' %}"><span class="glyphicon glyphicon-user"></span> 员工管理</a>
+            </li>
+            {% endif %}
+            {% has_perm_code request.user 'attendance:view' as can_attendance %}
+            {% if can_attendance %}
+            <li class="{% if 'attendance' in request.resolver_match.url_name %}active{% endif %}">
+                <a href="{% url 'attendance_list' %}"><span class="glyphicon glyphicon-time"></span> 考勤管理</a>
+            </li>
+            {% endif %}
+            {% has_perm_code request.user 'salary:view' as can_salary %}
+            {% if can_salary %}
+            <li class="{% if 'salary' in request.resolver_match.url_name %}active{% endif %}">
+                <a href="{% url 'salary_list' %}"><span class="glyphicon glyphicon-yen"></span> 薪资管理</a>
+            </li>
+            {% endif %}
+            {% has_perm_code request.user 'announcement:view' as can_announcement %}
+            {% if can_announcement %}
+            <li class="{% if 'announcement' in request.resolver_match.url_name %}active{% endif %}">
+                <a href="{% url 'announcement_list' %}"><span class="glyphicon glyphicon-bullhorn"></span> 公告管理</a>
+            </li>
+            {% endif %}
+            {% has_perm_code request.user 'task:view' as can_task %}
+            {% if can_task %}
+            <li class="{% if 'task' in request.resolver_match.url_name %}active{% endif %}">
+                <a href="{% url 'task_list' %}"><span class="glyphicon glyphicon-list-alt"></span> 任务管理</a>
+            </li>
+            {% endif %}
+            <li class="{% if request.resolver_match.url_name == 'ai_jd_page' %}active{% endif %}">
+                <a href="{% url 'ai_jd_page' %}"><span class="glyphicon glyphicon-education"></span> AI 招聘助手</a>
+            </li>
+            <li class="{% if request.resolver_match.url_name == 'ai_knowledge_page' %}active{% endif %}">
+                <a href="{% url 'ai_knowledge_page' %}"><span class="glyphicon glyphicon-book"></span> 制度问答</a>
+            </li>
+            {% has_perm_code request.user 'rbac:view' as can_rbac %}
+            {% if can_rbac %}
+            <li class="sidebar-section">系统管理</li>
+            <li class="{% if request.resolver_match.url_name == 'rbac_user_list' or request.resolver_match.url_name == 'rbac_user_edit' %}active{% endif %}">
+                <a href="{% url 'rbac_user_list' %}"><span class="glyphicon glyphicon-lock"></span> 用户授权</a>
+            </li>
+            <li class="{% if request.resolver_match.url_name == 'rbac_role_list' or request.resolver_match.url_name == 'rbac_role_add' or request.resolver_match.url_name == 'rbac_role_edit' %}active{% endif %}">
+                <a href="{% url 'rbac_role_list' %}"><span class="glyphicon glyphicon-key"></span> 角色权限</a>
+            </li>
+            {% endif %}
+        </ul>
+        <div class="sidebar-footer">
+            <div class="text-muted">Django 5.2 · MySQL</div>
+            <div class="text-muted">课程设计项目</div>
+        </div>
+    </aside>
+
+    <main class="site-main">
+        {% include 'includes/messages.html' %}
+        {% block content %}{% endblock %}
+    </main>
+</div>
+
+<script src="{% static 'vendor/jquery/jquery.min.js' %}"></script>
+<script src="{% static 'vendor/bootstrap/js/bootstrap.min.js' %}"></script>
+{% block extra_js %}{% endblock %}
+
+<!-- ========== AI 悬浮球（所有继承 base.html 的业务页面自动拥有） ========== -->
+<div class="ai-fab" id="aiFab" title="AI 助手">🤖</div>
+<div class="ai-panel" id="aiPanel">
+    <div class="ai-panel-header">
+        <span>🤖 AI 智能助手</span>
+        <span class="ai-close" id="aiClose">×</span>
+    </div>
+    <div class="ai-panel-body" id="aiBody">
+        <div class="ai-msg ai">
+            <div class="ai-avatar">🤖</div>
+            <div class="ai-bubble">你好！我是 AI 助手，有什么想问的？比如公司考勤、请假、薪资制度等都可以问我～</div>
+        </div>
+    </div>
+    <div class="ai-panel-footer">
+        <textarea id="aiInput" placeholder="输入问题...（Ctrl+Enter 发送）" rows="2"></textarea>
+        <button class="ai-send-btn" id="aiSend">发送</button>
+        <button class="ai-reset-btn" id="aiReset" title="清空对话">🗑</button>
+    </div>
+</div>
+
+<script>
+$(function () {
+    var $fab = $("#aiFab");
+    var $panel = $("#aiPanel");
+    var $body = $("#aiBody");
+    var $input = $("#aiInput");
+
+    // 登录页不显示
+    if ($("body").hasClass("login-page")) return;
+
+    $fab.on("click", function () {
+        $panel.toggleClass("open");
+        sessionStorage.setItem("aiPanelOpen", $panel.hasClass("open") ? "1" : "0");
+    });
+    $("#aiClose").on("click", function () {
+        $panel.removeClass("open");
+        sessionStorage.setItem("aiPanelOpen", "0");
+    });
+
+    // 切页面后面板保持展开
+    if (sessionStorage.getItem("aiPanelOpen") === "1") { $panel.addClass("open"); }
+
+    function appendMsg(who, text) {
+        var avatar = who === "ai" ? "🤖" : "👤";
+        $body.append(
+            '<div class="ai-msg ' + who + '">' +
+            '<div class="ai-avatar">' + avatar + '</div>' +
+            '<div class="ai-bubble"></div></div>'
+        );
+        $body.find(".ai-msg:last .ai-bubble").text(text);
+        $body.scrollTop($body[0].scrollHeight);
+    }
+
+    // 跨页面保留对话记录：页面加载时从 session 回填历史气泡
+    function restoreHistory() {
+        $.getJSON("/ai/chat/history/", function (res) {
+            if (!res || !res.ok || !res.messages || !res.messages.length) { return; }
+            $body.empty();
+            res.messages.forEach(function (m) {
+                appendMsg(m.role === "user" ? "user" : "ai", m.content || "");
+            });
+        });
+    }
+    restoreHistory();
+
+    // 打字机效果：一个一个字弹出来
+    function appendMsgTyping(text, speed, done) {
+        speed = speed || 30;  // 每个字间隔毫秒，越小越快
+        $body.append(
+            '<div class="ai-msg ai">' +
+            '<div class="ai-avatar">🤖</div>' +
+            '<div class="ai-bubble"></div></div>'
+        );
+        var $bubble = $body.find(".ai-msg:last .ai-bubble");
+        var i = 0;
+        // 去掉末尾的打字光标
+        function tick() {
+            if (i < text.length) {
+                $bubble.text(text.substring(0, i + 1));
+                i++;
+                $body.scrollTop($body[0].scrollHeight);
+                setTimeout(tick, speed);
+            } else {
+                if (done) done();
+            }
+        }
+        tick();
+    }
+
+    function appendTyping() {
+        $body.append(
+            '<div class="ai-msg ai">' +
+            '<div class="ai-avatar">🤖</div>' +
+            '<div class="ai-bubble"><span class="ai-typing"><span></span><span></span><span></span></span></div>' +
+            '</div>'
+        );
+        $body.scrollTop($body[0].scrollHeight);
+        return $body.find(".ai-msg:last");
+    }
+
+    function sendMsg() {
+        var text = $input.val().trim();
+        if (!text) return;
+        appendMsg("user", text);
+        $input.val("");
+
+        // 先创建一个 AI 气泡，逐字追加内容
+        $body.append(
+            '<div class="ai-msg ai">' +
+            '<div class="ai-avatar">🤖</div>' +
+            '<div class="ai-bubble"></div></div>'
+        );
+        var $bubble = $body.find(".ai-msg:last .ai-bubble");
+        $bubble.html('<span class="ai-typing"><span></span><span></span><span></span></span>');
+        $body.scrollTop($body[0].scrollHeight);
+
+        var gotFirstChunk = false;
+
+        // 用 fetch + ReadableStream 消费 SSE（POST 请求 EventSource 不支持）
+        var params = 'question=' + encodeURIComponent(text);
+        fetch('/ai/chat/sse/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            credentials: 'same-origin',
+            body: params,
+        }).then(function (res) {
+            if (!res.ok) { throw new Error('HTTP ' + res.status); }
+            var reader = res.body.getReader();
+            var decoder = new TextDecoder('utf-8');
+            var buffer = '';
+            var fullText = '';
+
+            function processChunk(raw) {
+                buffer += raw;
+                // SSE 事件块用 \n\n 分隔
+                var idx;
+                while ((idx = buffer.indexOf('\n\n')) !== -1) {
+                    var block = buffer.substring(0, idx);
+                    buffer = buffer.substring(idx + 2);
+                    // 提取 data: 行
+                    var lines = block.split('\n');
+                    for (var i = 0; i < lines.length; i++) {
+                        var line = lines[i].trim();
+                        if (line.indexOf('data:') === 0) {
+                            var payload = line.substring(5).trim();
+                            if (payload === '[DONE]') continue;
+                            try {
+                                var obj = JSON.parse(payload);
+                                if (obj.content) {
+                                    if (!gotFirstChunk) {
+                                        $bubble.text('');  // 去掉打字指示器
+                                        gotFirstChunk = true;
+                                    }
+                                    fullText += obj.content;
+                                    $bubble.text(fullText);
+                                    $body.scrollTop($body[0].scrollHeight);
+                                }
+                            } catch (e) { /* 忽略无法解析的块 */ }
+                        }
+                    }
+                }
+            }
+
+            function read() {
+                reader.read().then(function (result) {
+                    if (result.done) {
+                        if (!gotFirstChunk) {
+                            $bubble.text('（AI 没有返回内容）');
+                        }
+                        return;
+                    }
+                    var textChunk = decoder.decode(result.value, { stream: true });
+                    processChunk(textChunk);
+                    read();
+                }).catch(function (err) {
+                    if (!gotFirstChunk) {
+                        $bubble.text('❌ 流式读取错误：' + err.message);
+                    }
+                });
+            }
+            read();
+        }).catch(function (err) {
+            if (!gotFirstChunk) {
+                $bubble.html('❌ 网络错误，请检查服务是否启动：' + err.message);
+            }
+        });
+    }
+
+    $("#aiSend").on("click", sendMsg);
+    $input.on("keydown", function (e) {
+        if (e.keyCode === 13 && (e.ctrlKey || e.metaKey)) { e.preventDefault(); sendMsg(); }
+    });
+
+    $("#aiReset").on("click", function () {
+        if (!confirm("确定清空对话历史吗？")) return;
+        $.post("/ai/chat/", { question: "", reset: "1" });
+        $body.html(
+            '<div class="ai-msg ai">' +
+            '<div class="ai-avatar">🤖</div>' +
+            '<div class="ai-bubble">对话已清空，我们重新开始吧！</div>' +
+            '</div>'
+        );
+    });
+});
+</script>
+
+<div class="ai-review-mask" id="aiReviewMask">
+    <div class="ai-review-box">
+        <div class="ai-review-head">
+            <span id="aiReviewTitle">🤖 AI 员工点评</span>
+            <span class="ai-review-close" id="aiReviewClose">×</span>
+        </div>
+        <div class="ai-review-body" id="aiReviewBody">加载中…</div>
+    </div>
+</div>
+<style>
+.ai-review-mask{display:none;position:fixed;top:0;right:0;bottom:0;left:0;background:rgba(15,23,42,.45);z-index:3000;align-items:center;justify-content:center}
+.ai-review-mask.open{display:flex}
+.ai-review-box{width:560px;max-width:92vw;max-height:80vh;background:#fff;border-radius:12px;box-shadow:0 18px 48px rgba(0,0,0,.25);display:flex;flex-direction:column;overflow:hidden}
+.ai-review-head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;font-weight:600}
+.ai-review-close{cursor:pointer;font-size:20px;line-height:1}
+.ai-review-body{padding:16px;font-size:14px;line-height:1.9;color:#334155;overflow-y:auto;white-space:pre-wrap}
+</style>
+
+<script>
+window.aiReview = function (employeeId, name, month) {
+    var $mask = $("#aiReviewMask");
+    $("#aiReviewTitle").text("🤖 AI 点评 · " + (name || "员工") + (month ? " · " + month : ""));
+    $("#aiReviewBody").text("AI 正在分析该员工的考勤与薪资数据…");
+    $mask.addClass("open");
+    $.post("/ai/review/", { employee_id: employeeId, month: month || "" }, function (res) {
+        if (res && res.ok) {
+            $("#aiReviewBody").text(res.result);
+        } else {
+            $("#aiReviewBody").text("点评失败：" + ((res && res.error) || "未知错误"));
+        }
+    }).fail(function (xhr) {
+        $("#aiReviewBody").text("请求失败（HTTP " + xhr.status + "），请确认已登录并有权查看该员工。");
+    });
+};
+$(document).on("click", "#aiReviewClose", function () { $("#aiReviewMask").removeClass("open"); });
+$(document).on("click", "#aiReviewMask", function (e) {
+    if (e.target === this) { $(this).removeClass("open"); }
+});
+</script>
+</body>
+</html>

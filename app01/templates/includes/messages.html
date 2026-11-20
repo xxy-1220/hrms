@@ -1,0 +1,20 @@
+<!--
+  ================================================================
+  片段：includes/messages.html —— 全局消息提示条（flash 消息）
+  对应任务书：各模块新增 / 编辑 / 删除后的操作反馈
+  讲解要点（演示时照这个顺序讲）：
+   1. 新增一条部门或删除成功后，内容区最上方会弹出一条绿色提示；出错时是红色。
+   2. 提示条右侧有 ×，点一下就能关闭，不用刷新页面。
+   3. 消息由后端 messages 框架产生，本片段只负责「按类型上色并显示」，所以全站共用一份。
+   4. message.tags 决定颜色：error 映射成红色 danger，success 绿色，warning 黄色，其余蓝色 info。
+-->
+{% if messages %}
+<div class="message-stack">
+    {% for message in messages %}
+    <div class="alert alert-{% if message.tags == 'error' %}danger{% elif message.tags == 'success' %}success{% elif message.tags == 'warning' %}warning{% else %}info{% endif %} alert-dismissible" role="alert">
+        <button type="button" class="close" data-dismiss="alert" aria-label="关闭"><span aria-hidden="true">&times;</span></button>
+        {{ message }}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}

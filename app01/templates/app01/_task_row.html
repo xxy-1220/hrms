@@ -1,0 +1,33 @@
+<!--
+  ================================================================
+  片段：_task_row.html —— 任务表格「一行」的模板
+  对应任务书：T9 AJAX 任务模块
+  作用：既被 task_list 页面循环 include，也被后端 render_to_string 渲染后作为 AJAX 成功响应的 html 返回；
+        两处共用同一份片段，所以新插入的行和页面原有的行样式完全一致。
+  讲解要点（演示时照这个顺序讲）：
+   1. 新建任务成功后，绿色提示下方表格顶部会多出一行：ID、级别彩色标签、标题+详情、负责人、创建时间。
+   2. 这一行的 id 带任务主键（task-row-数字），级别标签颜色由 level-级别 这个 class 控制。
+-->
+{% load rbac %}
+<tr id="task-row-{{ task.id }}">
+    <td>{{ task.id }}</td>
+    <td><span class="badge-soft level-{{ task.level }}">{{ task.get_level_display }}</span></td>
+    <td>
+        <strong>{{ task.title }}</strong>
+        <div class="text-muted small">{{ task.detail }}</div>
+    </td>
+    <td>
+        {{ task.owner.name }}
+        <div class="text-muted small">{{ task.owner.depart.title }}</div>
+    </td>
+    <td class="text-muted">{{ task.created_at|date:'Y-m-d H:i' }}</td>
+    <td>
+        {% has_perm_code request.user 'task:delete' as can_delete_task %}
+        {% if can_delete_task %}
+        <form method="post" action="{% url 'task_delete' task.id %}" onsubmit="return confirm('确定删除该任务吗？');" style="display: inline;">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger btn-xs">删除</button>
+        </form>
+        {% endif %}
+    </td>
+</tr>

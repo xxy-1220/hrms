@@ -1,0 +1,23 @@
+{% extends 'app01/base.html' %}
+<!--
+  ================================================================
+  页面：403.html —— 无权限提示页
+  对应任务书：T5 RBAC 权限管理（越权访问时的友好提示）
+  讲解要点（演示时照这个顺序讲）：
+   1. 浏览器里是一张居中的卡片：大号红色「403」、标题「没有访问权限」、一句说明，最下面是「返回首页」按钮。
+   2. 用 staff01 手动输入一个它没权限的管理页地址（如部门新增），就会看到这个页面，而不是一堆报错。
+   3. 如果后端知道缺哪个权限，还会用灰色小字列出「所需权限：xxx」，方便排查该给账号分配什么角色。
+   4. 页面同样继承 base.html，所以导航和左侧菜单还在，用户可以直接点别处继续操作。
+-->
+{% block title %}无权访问 · 企业员工管理系统{% endblock %}
+{% block content %}
+<div class="panel-card" style="text-align:center; padding: 70px 20px;">
+    <div style="font-size: 56px; color: #d9534f;">403</div>
+    <h3>没有访问权限</h3>
+    <p class="text-muted">当前账号缺少执行该操作所需的权限，请联系超级管理员分配角色。</p>
+    {% if required_codes %}
+    <p class="text-muted small">所需权限：{{ required_codes|join:', ' }}</p>
+    {% endif %}
+    <a href="{% url 'dashboard' %}" class="btn btn-primary">返回首页</a>
+</div>
+{% endblock %}

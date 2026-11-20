@@ -1,0 +1,103 @@
+{% extends 'app01/base.html' %}
+{% load rbac %}
+<!--
+  ================================================================
+  页面：employee_list.html —— 员工管理列表
+  对应任务书：T3 员工管理（模糊搜索、部门筛选、头像展示、分页）
+  讲解要点（演示时照这个顺序讲）：
+   1. 浏览器里顶部右侧是蓝色添加按钮；筛选区两件套：姓名输入框 + 部门下拉框，点「查询」表格立刻按条件过滤。
+   2. 表格第一列是员工头像（没上传头像就显示姓名首字的圆形占位块）和姓名，后面是年龄、性别、部门、手机号、余额、入职时间、操作。
+   3. 指一下「账户余额」：数字保留两位小数；「性别」显示的是中文而不是数据库编码。
+   4. staff01 登录后行内没有编辑/删除按钮；有权限的账号点删除先弹确认框；表格底部分页条翻页时不会丢筛选条件。
+-->
+
+{% block title %}员工管理 · 企业员工管理系统{% endblock %}
+
+{% block content %}
+<div class="page-header-box">
+    <div>
+        <h3>员工管理</h3>
+        <div class="sub">支持姓名模糊搜索、部门筛选与分页，手机号全系统唯一</div>
+    </div>
+    {% has_perm_code request.user 'employee:add' as can_add %}
+    {% if can_add %}
+    <a href="{% url 'employee_add' %}" class="btn btn-primary">
+        <span class="glyphicon glyphicon-plus"></span> 新增员工
+    </a>
+    {% endif %}
+</div>
+
+<form method="get" class="filter-bar form-inline">
+    <div class="form-group">
+        <input type="text" name="q" value="{{ keyword }}" class="form-control" placeholder="按姓名模糊搜索">
+    </div>
+    <div class="form-group">
+        <select name="depart" class="form-control">
+            <option value="">全部部门</option>
+            {% for dept in departments %}
+            <option value="{{ dept.id }}" {% if depart_id == dept.id|stringformat:'s' %}selected{% endif %}>{{ dept.title }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <button type="submit" class="btn btn-default"><span class="glyphicon glyphicon-search"></span> 查询</button>
+    {% if keyword or depart_id %}
+    <a href="{% url 'employee_list' %}" class="btn btn-link">重置</a>
+    {% endif %}
+</form>
+
+<div class="table-panel">
+    <table class="table table-hover">
+        <thead>
+        <tr>
+            <th>员工</th>
+            <th style="width: 60px;">年龄</th>
+            <th style="width: 70px;">性别</th>
+            <th>部门</th>
+            <th>手机号</th>
+            <th style="width: 110px;">账户余额</th>
+            <th style="width: 110px;">入职时间</th>
+            <th style="width: 240px;">操作</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for emp in page_obj %}
+        <tr>
+            <td>
+                {% if emp.avatar %}
+                <img src="{{ emp.avatar.url }}" class="avatar" alt="{{ emp.name }}">
+                {% else %}
+                <span class="avatar-placeholder">{{ emp.name|slice:':1' }}</span>
+                {% endif %}
+                <strong>{{ emp.name }}</strong>
+            </td>
+            <td>{{ emp.age }}</td>
+            <td>{{ emp.get_gender_display }}</td>
+            <td>{{ emp.depart.title }}</td>
+            <td>{{ emp.phone }}</td>
+            <td>￥{{ emp.balance|floatformat:2 }}</td>
+            <td class="text-muted">{{ emp.hire_date|date:'Y-m-d' }}</td>
+            <td>
+                <button type="button" class="btn btn-info btn-action"
+                        onclick="aiReview({{ emp.id }}, '{{ emp.name|escapejs }}')">AI 点评</button>
+                {% has_perm_code request.user 'employee:edit' as can_edit %}
+                {% if can_edit %}
+                <a href="{% url 'employee_edit' emp.id %}" class="btn btn-default btn-action">编辑</a>
+                {% endif %}
+                {% has_perm_code request.user 'employee:delete' as can_delete %}
+                {% if can_delete %}
+                <form method="post" action="{% url 'employee_delete' emp.id %}" class="inline-form"
+                      onsubmit="return confirm('确认删除员工「{{ emp.name }}」吗？');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger btn-action">删除</button>
+                </form>
+                {% endif %}
+            </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="8"><div class="empty-state">没有符合条件的员工</div></td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% include 'includes/pagination.html' %}
+</div>
+{% endblock %}

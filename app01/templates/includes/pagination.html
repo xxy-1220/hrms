@@ -1,0 +1,36 @@
+<!--
+  ================================================================
+  片段：includes/pagination.html —— 通用分页条（被各列表页 include 进来）
+  对应任务书：T2 部门 / T3 员工 / T6 考勤 / T7 薪资 / T8 公告 / T5 用户列表共用
+  讲解要点（演示时照这个顺序讲）：
+   1. 它显示在表格正下方：左边是「上一页 / 1 2 3 / 下一页」按钮，当前页蓝色高亮，首页时「上一页」变灰不可点。
+   2. 右边一行小字「共 N 条，第 X / Y 页」。
+   3. 数据不足一页时整条分页不出现（看第一个 if 判断）。
+   4. 页码链接都带 ?page= 参数，同时用 query_string 把搜索关键字、部门/月份筛选条件拼在后面，翻页后筛选条件不会丢。
+-->
+{% if page_obj.has_other_pages %}
+<nav class="pager-wrap" aria-label="分页">
+    <ul class="pagination">
+        {% if page_obj.has_previous %}
+        <li><a href="?page={{ page_obj.previous_page_number }}{% if query_string %}&{{ query_string }}{% endif %}">&laquo; 上一页</a></li>
+        {% else %}
+        <li class="disabled"><a href="#">&laquo; 上一页</a></li>
+        {% endif %}
+
+        {% for num in page_obj.paginator.page_range %}
+            {% if num == page_obj.number %}
+            <li class="active"><a href="#">{{ num }}</a></li>
+            {% else %}
+            <li><a href="?page={{ num }}{% if query_string %}&{{ query_string }}{% endif %}">{{ num }}</a></li>
+            {% endif %}
+        {% endfor %}
+
+        {% if page_obj.has_next %}
+        <li><a href="?page={{ page_obj.next_page_number }}{% if query_string %}&{{ query_string }}{% endif %}">下一页 &raquo;</a></li>
+        {% else %}
+        <li class="disabled"><a href="#">下一页 &raquo;</a></li>
+        {% endif %}
+    </ul>
+    <span class="pager-info">共 {{ page_obj.paginator.count }} 条，第 {{ page_obj.number }} / {{ page_obj.paginator.num_pages }} 页</span>
+</nav>
+{% endif %}

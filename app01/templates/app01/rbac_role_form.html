@@ -1,0 +1,83 @@
+{% extends 'app01/base.html' %}
+{% load static %}
+<!--
+  ================================================================
+  页面：rbac_role_form.html —— 角色新增 / 编辑 + 权限勾选
+  对应任务书：T5 RBAC 权限管理
+  讲解要点（演示时照这个顺序讲）：
+   1. 浏览器里上方是角色基础信息（名称、编码、描述）三个输入框，一行三列排开。
+   2. 下面「权限分配」区按模块分组（部门、员工、考勤、薪资、公告、任务、统计、系统等），每个权限一个复选框，后面括号里是权限编码。
+   3. 右上角「全选 / 全不选」两个小按钮可以一键勾选或清空，演示时点一下就能看到所有复选框状态变化。
+   4. 编辑已有角色时，它原本拥有的权限会提前勾上；保存后回到角色列表，权限数量会变。
+-->
+
+{% block title %}{{ title }} · 企业员工管理系统{% endblock %}
+
+{% block content %}
+<div class="page-header-box">
+    <div>
+        <h3>{{ title }}</h3>
+        <div class="sub">填写角色信息并勾选其拥有的权限，保存后立即生效</div>
+    </div>
+    <a href="{% url 'rbac_role_list' %}" class="btn btn-default">
+        <span class="glyphicon glyphicon-arrow-left"></span> 返回角色列表
+    </a>
+</div>
+
+<div class="panel-card">
+    <form method="post" novalidate>
+        {% csrf_token %}
+
+        <div class="row">
+            {% for field in form %}
+            <div class="col-md-4">
+                <div class="form-group {% if field.errors %}has-error{% endif %}">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% for error in field.errors %}<span class="help-block">{{ error }}</span>{% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <h4 style="margin-top: 10px;">权限分配
+            <small class="text-muted">（勾选后该角色可访问对应功能）</small>
+            <span class="pull-right">
+                <button type="button" id="checkAllPerms" class="btn btn-default btn-xs">全选</button>
+                <button type="button" id="clearAllPerms" class="btn btn-default btn-xs">全不选</button>
+            </span>
+        </h4>
+
+        <div class="permission-groups">
+            {% for group in permission_groups %}
+            <div class="perm-group">
+                <h5>{{ group.module }}</h5>
+                {% for perm in group.permissions %}
+                <label class="checkbox-inline">
+                    <input type="checkbox" name="permissions" value="{{ perm.id }}"
+                           class="perm-checkbox" {% if perm.id in selected_ids %}checked{% endif %}>
+                    {{ perm.name }} <span class="text-muted small">({{ perm.code }})</span>
+                </label>
+                {% endfor %}
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">保存角色</button>
+            <a href="{% url 'rbac_role_list' %}" class="btn btn-default">取消</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    $('#checkAllPerms').on('click', function () {
+        $('.perm-checkbox').prop('checked', true);
+    });
+    $('#clearAllPerms').on('click', function () {
+        $('.perm-checkbox').prop('checked', false);
+    });
+</script>
+{% endblock %}

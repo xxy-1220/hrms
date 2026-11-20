@@ -1,0 +1,35 @@
+{% extends 'app01/base.html' %}
+<!--
+  ================================================================
+  页面：announcement_form.html —— 公告发布 / 编辑表单
+  对应任务书：T8 公告管理
+  讲解要点（演示时照这个顺序讲）：
+   1. 浏览器里是一张表单卡片：公告标题输入框、公告内容文本域，下面保存/取消。
+   2. 发布人不用选：新建时后端自动取当前登录账号；发布时间也由系统自动写入。
+   3. 内容可以写多段，换行会保留；保存后回列表，新公告出现在最前面（置顶公告仍在最上面）。
+   4. 标题留空提交，字段变红并提示，页面不跳转。
+-->
+{% block title %}{{ title }} · 企业员工管理系统{% endblock %}
+
+{% block content %}
+<div class="page-header-box">
+    <div>
+        <h3>{{ title }}</h3>
+        <div class="sub">发布人取当前登录账号，发布时间由系统自动写入</div>
+    </div>
+    <a href="{% url 'announcement_list' %}" class="btn btn-default">
+        <span class="glyphicon glyphicon-arrow-left"></span> 返回列表
+    </a>
+</div>
+
+<div class="panel-card form-panel">
+    <form method="post" novalidate>
+        {% csrf_token %}
+        {% include 'includes/form_fields.html' %}
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">保存</button>
+            <a href="{% url 'announcement_list' %}" class="btn btn-default">取消</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

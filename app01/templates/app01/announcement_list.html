@@ -1,0 +1,83 @@
+{% extends 'app01/base.html' %}
+{% load rbac %}
+<!--
+  ================================================================
+  页面：announcement_list.html —— 公告管理列表
+  对应任务书：T8 公告管理（发布、置顶、搜索、编辑、删除、分页）
+  讲解要点（演示时照这个顺序讲）：
+   1. 浏览器里公告不是表格，而是一张张白色卡片竖向排列：标题、发布人、发布时间，下面是正文摘要。
+   2. 置顶公告标题前有红色「置顶」小标签，列表排序时置顶的排在最前面。
+   3. 每张卡片右上角有按钮：先点「置顶」会变成「取消置顶」（同一个按钮切换状态），再往右是编辑、删除。
+   4. 顶部搜索框按标题/内容模糊搜索；删除先弹确认框，列表下方是分页条；staff01 只能看，看不到任何管理按钮。
+-->
+
+{% block title %}公告管理 · 企业员工管理系统{% endblock %}
+
+{% block content %}
+<div class="page-header-box">
+    <div>
+        <h3>公告管理</h3>
+        <div class="sub">置顶公告优先展示，支持标题 / 内容模糊搜索与分页</div>
+    </div>
+    {% has_perm_code request.user 'announcement:add' as can_add %}
+    {% if can_add %}
+    <a href="{% url 'announcement_add' %}" class="btn btn-primary">
+        <span class="glyphicon glyphicon-plus"></span> 发布公告
+    </a>
+    {% endif %}
+</div>
+
+<form method="get" class="filter-bar form-inline">
+    <div class="form-group">
+        <input type="text" name="q" value="{{ keyword }}" class="form-control" placeholder="搜索公告标题或内容" style="width: 260px;">
+    </div>
+    <button type="submit" class="btn btn-default"><span class="glyphicon glyphicon-search"></span> 搜索</button>
+    {% if keyword %}
+    <a href="{% url 'announcement_list' %}" class="btn btn-link">重置</a>
+    {% endif %}
+</form>
+
+{% for item in page_obj %}
+<div class="panel-card">
+    <div class="page-header-box" style="margin-bottom: 10px;">
+        <div>
+            <h4 style="margin: 0;">
+                {% if item.is_top %}<span class="badge-soft status-absent">置顶</span>{% endif %}
+                {{ item.title }}
+            </h4>
+            <div class="sub">
+                发布人：{{ item.publisher.username|default:'系统' }}
+                · {{ item.publish_time|date:'Y-m-d H:i' }}
+            </div>
+        </div>
+        <div>
+            {% has_perm_code request.user 'announcement:edit' as can_edit %}
+            {% if can_edit %}
+            <form method="post" action="{% url 'announcement_toggle_top' item.id %}" class="inline-form">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-default btn-action">
+                    {% if item.is_top %}取消置顶{% else %}置顶{% endif %}
+                </button>
+            </form>
+            <a href="{% url 'announcement_edit' item.id %}" class="btn btn-default btn-action">编辑</a>
+            {% endif %}
+            {% has_perm_code request.user 'announcement:delete' as can_delete %}
+            {% if can_delete %}
+            <form method="post" action="{% url 'announcement_delete' item.id %}" class="inline-form"
+                  onsubmit="return confirm('确认删除公告「{{ item.title }}」吗？');">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger btn-action">删除</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+    <div class="text-muted" style="line-height: 1.9;">{{ item.content|linebreaksbr|truncatechars:400 }}</div>
+</div>
+{% empty %}
+<div class="panel-card"><div class="empty-state">暂无公告</div></div>
+{% endfor %}
+
+<div class="table-panel" style="border: none; background: transparent; padding: 0;">
+    {% include 'includes/pagination.html' %}
+</div>
+{% endblock %}

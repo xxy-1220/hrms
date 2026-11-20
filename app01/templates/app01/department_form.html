@@ -1,0 +1,35 @@
+{% extends 'app01/base.html' %}
+<!--
+  ================================================================
+  页面：department_form.html —— 部门新增 / 编辑表单
+  对应任务书：T2 部门管理（同一个模板复用新增和编辑两种场景）
+  讲解要点（演示时照这个顺序讲）：
+   1. 浏览器里只有一张白色卡片：部门名称输入框、部门描述文本域，下面蓝色「保存」和灰色「取消」两个按钮。
+   2. 看一下标题：新增时是「新增部门」，编辑时是「编辑部门」——标题不是写死的，是后端传来的 title 变量。
+   3. 名称留空点保存：输入框变红并出现错误文字，页面不跳走，已填的描述还在。
+   4. 保存成功后回到部门列表，列表上方会 flash 一条绿色提示；点「取消」或左上角「返回列表」都不保存直接回去。
+-->
+{% block title %}{{ title }} · 企业员工管理系统{% endblock %}
+
+{% block content %}
+<div class="page-header-box">
+    <div>
+        <h3>{{ title }}</h3>
+        <div class="sub">部门信息填写完成后提交保存</div>
+    </div>
+    <a href="{% url 'department_list' %}" class="btn btn-default">
+        <span class="glyphicon glyphicon-arrow-left"></span> 返回列表
+    </a>
+</div>
+
+<div class="panel-card form-panel">
+    <form method="post" novalidate>
+        {% csrf_token %}
+        {% include 'includes/form_fields.html' %}
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">保存</button>
+            <a href="{% url 'department_list' %}" class="btn btn-default">取消</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

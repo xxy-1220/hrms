@@ -1,0 +1,192 @@
+{% extends 'app01/base.html' %}
+
+{% block title %}AI 智能 JD 生成器{% endblock %}
+
+{% block content %}
+<div class="page-header-box">
+    <div>
+        <h3>🤖 AI 招聘助手</h3>
+        <div class="sub">输入岗位名称，AI 按「岗位职责 / 任职要求 / 薪资福利」三段式生成结构化 JD</div>
+    </div>
+</div>
+
+{% if not ai_ready %}
+<div class="alert alert-warning">
+    <strong>尚未检测到大模型配置：</strong>请在项目根目录 <code>.env</code> 中填写
+    <code>SILICONFLOW_API_KEY</code> 后重启服务，否则生成时只会返回配置提示。
+</div>
+{% endif %}
+
+<div class="row">
+    <div class="col-md-5">
+        <div class="panel panel-default">
+            <div class="panel-heading"><strong>岗位信息</strong></div>
+            <div class="panel-body">
+                <label for="jobTitle" class="control-label">岗位名称</label>
+                <div class="input-group">
+                    <input type="text" id="jobTitle" class="form-control"
+                           placeholder="例如：前端工程师、Java 后端、产品经理" value="前端工程师">
+                    <span class="input-group-btn">
+                        <button class="btn btn-primary" id="btnGenerate">✨ 生成 JD</button>
+                    </span>
+                </div>
+                <p class="help-block">按回车或点按钮，AI 会输出三段式 JD：岗位职责 / 任职要求 / 薪资福利</p>
+                <div style="margin-top:12px">
+                    <label class="text-muted" style="font-size:12px">快速选择：</label>
+                    <div>
+                        {% for tag in quick_tags %}
+                        <button type="button" class="btn btn-xs btn-default quick-tag">{{ tag }}</button>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="panel panel-info">
+            <div class="panel-heading"><strong>💡 使用说明</strong></div>
+            <div class="panel-body small text-muted" style="line-height:1.8">
+                <ul style="padding-left:18px;margin:0">
+                    <li>岗位名越具体，JD 质量越高（推荐「前端工程师（React）」这样的格式）</li>
+                    <li>生成结果为 Markdown 格式，可直接复制到招聘平台或 Word</li>
+                    <li>如果 AI 回答异常，刷新页面重试即可</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-7">
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <strong>生成结果</strong>
+                <button class="btn btn-xs btn-default pull-right" id="btnCopy" disabled>📋 复制</button>
+            </div>
+            <div class="panel-body">
+                <div id="jdResult" class="jd-result" style="min-height:400px">
+                    <p class="text-muted">在左侧输入岗位名称，点击「生成 JD」开始...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .jd-result {
+        background: #fafbfc;
+        border: 1px solid #e1e4e8;
+        border-radius: 6px;
+        padding: 16px 20px;
+        font-size: 14px;
+        line-height: 1.8;
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+    .jd-result h2 { font-size: 18px; color: #667eea; margin: 16px 0 8px; border-bottom: 1px dashed #ddd; padding-bottom: 4px; }
+    .jd-result h3 { font-size: 15px; color: #475569; margin: 12px 0 6px; }
+    .jd-result p { margin: 6px 0; }
+    .jd-result ul { padding-left: 20px; margin: 6px 0; }
+    .jd-result li { margin: 2px 0; }
+    .jd-result.loading::before {
+        content: 'AI 正在撰写中...';
+        display: block;
+        color: #667eea;
+        margin-bottom: 8px;
+        font-weight: bold;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(function () {
+    var $input = $('#jobTitle');
+    var $btn = $('#btnGenerate');
+    var $result = $('#jdResult');
+    var $copy = $('#btnCopy');
+
+    // 快速标签
+    $('.quick-tag').on('click', function () {
+        $input.val($(this).text()).focus();
+    });
+
+    function escapeHtml(text) {
+        return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function markdownLite(text) {
+        var html = '', inList = false;
+        var bold = function (s) { return s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>'); };
+        var closeList = function () { if (inList) { html += '</ul>'; inList = false; } };
+        escapeHtml(text).split(/\r?\n/).forEach(function (line) {
+            var t = line.trim();
+            if (!t) { closeList(); return; }
+            if (/^#{1,6}\s/.test(t)) {
+                closeList();
+                var tag = t.match(/^#+/)[0].length <= 2 ? 'h2' : 'h3';
+                html += '<' + tag + '>' + bold(t.replace(/^#+\s*/, '')) + '</' + tag + '>';
+            } else if (/^([-*•]|\d+[.、])\s*/.test(t)) {
+                if (!inList) { html += '<ul>'; inList = true; }
+                html += '<li>' + bold(t.replace(/^([-*•]|\d+[.、])\s*/, '')) + '</li>';
+            } else {
+                closeList();
+                html += '<p>' + bold(t) + '</p>';
+            }
+        });
+        closeList();
+        return html;
+    }
+
+    function generate() {
+        var title = $input.val().trim();
+        if (title.length < 2) { alert('岗位名称至少 2 个字符'); return; }
+
+        $btn.prop('disabled', true).text('生成中...');
+        $result.addClass('loading').html('<p class="text-muted">正在调用 AI 撰写 JD，请稍候...</p>');
+        $copy.prop('disabled', true);
+
+        $.ajax({
+            url: '/ai/jd/generate/', type: 'POST', dataType: 'json',
+            data: { job_title: title }, timeout: 60000
+        }).done(function (res) {
+            $btn.prop('disabled', false).text('✨ 生成 JD');
+            $result.removeClass('loading');
+            if (!res || !res.ok) {
+                $result.html('<div class="alert alert-danger">' +
+                    escapeHtml((res && res.error) || '生成失败，请稍后重试') + '</div>');
+                return;
+            }
+            if (res.result.indexOf('⚠️') === 0) {
+                $result.html('<div class="alert alert-warning" style="white-space:pre-wrap">' +
+                    escapeHtml(res.result) + '</div>');
+                return;
+            }
+            $result.html(markdownLite(res.result));
+            $result.data('raw', res.result);
+            $copy.prop('disabled', false);
+        }).fail(function (xhr) {
+            $btn.prop('disabled', false).text('✨ 生成 JD');
+            $result.removeClass('loading').html(
+                '<div class="alert alert-danger">请求失败（' +
+                (xhr.status === 0 ? '超时或网络中断' : 'HTTP ' + xhr.status) +
+                '），请确认服务已启动。</div>'
+            );
+        });
+    }
+
+    $btn.on('click', generate);
+    $input.on('keydown', function (e) { if (e.keyCode === 13) generate(); });
+
+    $copy.on('click', function () {
+        var text = $result.data('raw') || $result.text();
+        if (!text) return;
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        $copy.text('✅ 已复制');
+        setTimeout(function () { $copy.text('📋 复制'); }, 1500);
+    });
+});
+</script>
+{% endblock %}

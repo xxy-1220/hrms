@@ -1,0 +1,164 @@
+{% extends 'app01/base.html' %}
+{% load rbac %}
+<!--
+  ================================================================
+  页面：task_list.html —— 任务管理（AJAX 异步提交）
+  对应任务书：T9 AJAX 任务模块（页面不刷新提交、错误实时回显）
+  讲解要点（演示时照这个顺序讲）：
+   1. 浏览器里左边（有权限时）是「新建任务」表单卡片，右边是任务表格；没有 task:add 权限时左边表单不出现，表格占满整行。
+   2. 表单依次是级别下拉、标题、详情、负责人下拉；点「提交任务」页面不会刷新，表格最上面立刻插入新的一行。
+   3. 演示校验失败：标题留空直接提交，该输入框变红、下面出现红色错误文字，其他已填内容不会清空。
+   4. 提交成功后表单自动清空并弹出绿色「任务创建成功」，约 2.5 秒消失；只有断网或后端异常才显示「提交失败，请稍后重试」。
+-->
+
+{% block title %}任务管理 · 企业员工管理系统{% endblock %}
+
+{% block content %}
+<div class="page-header-box">
+    <div>
+        <h3>任务管理</h3>
+        <div class="sub">AJAX 异步提交，校验错误实时回显且页面不刷新</div>
+    </div>
+</div>
+
+<div class="row">
+    {% has_perm_code request.user 'task:add' as can_add %}
+    {% if can_add %}
+    <div class="col-md-4">
+        <div class="panel-card">
+            <h4>新建任务</h4>
+            <div id="taskAlert" class="alert" style="display: none;"></div>
+            <form id="taskForm" method="post" action="{% url 'task_create_ajax' %}" novalidate>
+                {% csrf_token %}
+                <div class="form-group" data-field="level">
+                    <label for="{{ form.level.id_for_label }}">级别</label>
+                    {{ form.level }}
+                    <span class="ajax-error text-danger small"></span>
+                </div>
+                <div class="form-group" data-field="title">
+                    <label for="{{ form.title.id_for_label }}">标题</label>
+                    {{ form.title }}
+                    <span class="ajax-error text-danger small"></span>
+                </div>
+                <div class="form-group" data-field="detail">
+                    <label for="{{ form.detail.id_for_label }}">详情</label>
+                    {{ form.detail }}
+                    <span class="ajax-error text-danger small"></span>
+                </div>
+                <div class="form-group" data-field="owner">
+                    <label for="{{ form.owner.id_for_label }}">负责人</label>
+                    {{ form.owner }}
+                    <span class="ajax-error text-danger small"></span>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">提交任务</button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="{% if can_add %}col-md-8{% else %}col-md-12{% endif %}">
+        <div class="table-panel">
+            <table class="table table-hover">
+                <thead>
+                <tr>
+                    <th style="width: 55px;">ID</th>
+                    <th style="width: 70px;">级别</th>
+                    <th>标题 / 详情</th>
+                    <th style="width: 130px;">负责人</th>
+                    <th style="width: 140px;">创建时间</th>
+                    <th style="width: 70px;">操作</th>
+                </tr>
+                </thead>
+                <tbody id="taskBody">
+                {% for task in tasks %}
+                {% include 'app01/_task_row.html' %}
+                {% empty %}
+                <tr id="taskEmpty"><td colspan="6"><div class="empty-state">暂无任务，请先创建</div></td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% has_perm_code request.user 'task:add' as can_add_js %}
+{% if can_add_js %}
+<script>
+    function getCookie(name) {
+        var cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            var cookies = document.cookie.split(';');
+            for (var i = 0; i < cookies.length; i++) {
+                var cookie = $.trim(cookies[i]);
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    function clearTaskErrors() {
+        $('#taskForm .form-group').removeClass('has-error');
+        $('#taskForm .ajax-error').text('');
+        $('#taskAlert').hide().removeClass('alert-success alert-danger').text('');
+    }
+
+    function showTaskErrors(errors) {
+        var globalMessage = '';
+        $.each(errors, function (field, messages) {
+            var text = (messages || []).join('，');
+            if (field === '__all__') {
+                globalMessage = text;
+                return;
+            }
+            var $group = $('#taskForm .form-group[data-field="' + field + '"]');
+            $group.addClass('has-error');
+            $group.find('.ajax-error').text(text);
+        });
+        if (globalMessage) {
+            $('#taskAlert').addClass('alert alert-danger').text(globalMessage).show();
+        }
+    }
+
+    $('#taskForm').on('submit', function (event) {
+        event.preventDefault();
+        clearTaskErrors();
+        var $button = $(this).find('button[type="submit"]').prop('disabled', true).text('提交中...');
+
+        $.ajax({
+            url: $(this).attr('action'),
+            type: 'POST',
+            data: $(this).serialize(),
+            dataType: 'json',
+            headers: {'X-CSRFToken': getCookie('csrftoken')}
+        }).done(function (res) {
+            if (res.ok) {
+                $('#taskEmpty').remove();
+                $('#taskBody').prepend(res.html);
+                $('#taskForm')[0].reset();
+                $('#taskAlert')
+                    .addClass('alert alert-success')
+                    .text(res.message)
+                    .show();
+                setTimeout(function () { $('#taskAlert').fadeOut(); }, 2500);
+            } else {
+                showTaskErrors(res.errors || {});
+            }
+        }).fail(function (xhr) {
+            var res = xhr.responseJSON;
+            if (res && res.errors) {
+                showTaskErrors(res.errors);
+            } else {
+                $('#taskAlert').addClass('alert alert-danger').text('提交失败，请稍后重试').show();
+            }
+        }).always(function () {
+            $button.prop('disabled', false).text('提交任务');
+        });
+    });
+</script>
+{% endif %}
+{% endblock %}

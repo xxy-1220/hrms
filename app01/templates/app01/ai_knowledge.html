@@ -1,0 +1,95 @@
+{% extends 'app01/base.html' %}
+
+{% block title %}制度问答 · 企业员工管理系统{% endblock %}
+
+{% block content %}
+<div class="page-header-box">
+    <div>
+        <h3>制度智能问答</h3>
+        <div class="sub">先检索公司制度知识库再作答；知识库里没有的内容会直接说明「不知道」</div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-5">
+        <div class="panel panel-default">
+            <div class="panel-heading"><strong>提问</strong></div>
+            <div class="panel-body">
+                <label for="kbQuestion" class="control-label">你想了解哪项制度？</label>
+                <textarea id="kbQuestion" class="form-control" rows="3"
+                          placeholder="例如：请假怎么请？薪资什么时候发？年终奖怎么算？"></textarea>
+                <div style="margin-top:10px">
+                    <button class="btn btn-primary" id="btnAsk">
+                        <span class="glyphicon glyphicon-search"></span> 提问
+                    </button>
+                    <span class="text-muted small" style="margin-left:8px">Ctrl + Enter 快捷发送</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel panel-info">
+            <div class="panel-heading"><strong>知识库中已有的制度</strong></div>
+            <div class="panel-body small">
+                {% for sample in samples %}
+                <button class="btn btn-xs btn-default kb-sample"
+                        data-question="{{ sample.title }}">[{{ sample.category }}] {{ sample.title }}</button>
+                {% empty %}
+                <p class="text-muted" style="margin:0">知识库为空，请先执行
+                    <code>python manage.py demo_data</code> 预置制度数据。</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-7">
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <strong>回答</strong>
+                <span class="pull-right text-muted small" id="kbSource"></span>
+            </div>
+            <div class="panel-body">
+                <div id="kbAnswer"
+                     style="min-height:320px;line-height:1.9;font-size:14px;white-space:pre-wrap;color:#334155">
+                    <p class="text-muted">在左侧输入问题并点击「提问」，AI 会先检索制度条款再作答。</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(function () {
+    function ask(question) {
+        question = (question || "").trim();
+        if (!question) { return; }
+        $("#kbAnswer").text("正在检索制度条款…");
+        $("#kbSource").text("");
+        $.post("/ai/knowledge/ask/", { question: question }, function (res) {
+            if (res && res.ok) {
+                $("#kbAnswer").text(res.result);
+                $("#kbSource").text(res.found ? "已命中知识库条款" : "知识库无匹配条款");
+            } else {
+                $("#kbAnswer").text("提问失败：" + ((res && res.error) || "未知错误"));
+            }
+        }).fail(function (xhr) {
+            $("#kbAnswer").text("请求失败（HTTP " + xhr.status + "），请确认服务已启动。");
+        });
+    }
+
+    $("#btnAsk").on("click", function () { ask($("#kbQuestion").val()); });
+    $("#kbQuestion").on("keydown", function (e) {
+        if (e.keyCode === 13 && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault();
+            ask($(this).val());
+        }
+    });
+    $(document).on("click", ".kb-sample", function () {
+        var q = $(this).data("question");
+        $("#kbQuestion").val(q);
+        ask(q);
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,41 @@
+{% extends 'app01/base.html' %}
+<!--
+  ================================================================
+  页面：employee_form.html —— 员工新增 / 编辑表单
+  对应任务书：T3 员工管理（含头像上传）
+  讲解要点（演示时照这个顺序讲）：
+   1. 浏览器里是一张较长的表单卡片：姓名、手机号、部门下拉、性别、年龄、入职日期、账户余额、头像上传等字段。
+   2. 先看「编辑」场景：卡片顶部会显示当前头像的缩略图，再选新图片就能覆盖旧头像。
+   3. 重点指表单标签上的 enctype="multipart/form-data"：上传文件必须写它，否则后端收不到图片（初学者最常漏）。
+   4. 故意把年龄填成 200 或手机号重复：对应字段标红出现提示，其他已填内容保留。
+-->
+{% block title %}{{ title }} · 企业员工管理系统{% endblock %}
+
+{% block content %}
+<div class="page-header-box">
+    <div>
+        <h3>{{ title }}</h3>
+        <div class="sub">年龄 18~65 岁，手机号需为 11 位且全系统唯一，头像可选上传</div>
+    </div>
+    <a href="{% url 'employee_list' %}" class="btn btn-default">
+        <span class="glyphicon glyphicon-arrow-left"></span> 返回列表
+    </a>
+</div>
+
+<div class="panel-card form-panel">
+    {% if employee and employee.avatar %}
+    <div class="form-group">
+        <label>当前头像</label>
+        <div><img src="{{ employee.avatar.url }}" class="avatar" style="width: 64px; height: 64px;" alt="{{ employee.name }}"></div>
+    </div>
+    {% endif %}
+    <form method="post" enctype="multipart/form-data" novalidate>
+        {% csrf_token %}
+        {% include 'includes/form_fields.html' %}
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">保存</button>
+            <a href="{% url 'employee_list' %}" class="btn btn-default">取消</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

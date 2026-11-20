@@ -1,0 +1,41 @@
+{% extends 'app01/base.html' %}
+<!--
+  ================================================================
+  页面：rbac_user_form.html —— 用户授权编辑页（给账号分配角色 / 部门 / 状态）
+  对应任务书：T5 RBAC 权限管理
+  讲解要点（演示时照这个顺序讲）：
+   1. 浏览器里标题是「分配角色：账号名」，下面先显示只读的登录账号信息，再是一张表单。
+   2. 表单里可以选所属部门、勾选一个或多个角色、设置账号启用/禁用，点「保存授权」生效。
+   3. 用户名不能改（只读展示）；保存后回账号列表，角色列会多出刚才分配的角色标签。
+   4. 分配角色等于给账号「套权限模板」：角色本身有哪些权限，由角色权限页维护。
+-->
+{% block title %}{{ title }} · 企业员工管理系统{% endblock %}
+
+{% block content %}
+<div class="page-header-box">
+    <div>
+        <h3>{{ title }}：{{ target.username }}</h3>
+        <div class="sub">用户 - 角色 - 权限三层联动，保存后立即对其后续请求生效</div>
+    </div>
+    <a href="{% url 'rbac_user_list' %}" class="btn btn-default">
+        <span class="glyphicon glyphicon-arrow-left"></span> 返回用户列表
+    </a>
+</div>
+
+<div class="panel-card form-panel">
+    <div class="form-group">
+        <label>登录账号</label>
+        <p class="form-control-static"><strong>{{ target.username }}</strong>
+            <span class="text-muted">（用户名不可修改，最近登录：{{ target.last_login|date:'Y-m-d H:i'|default:'从未登录' }}）</span>
+        </p>
+    </div>
+    <form method="post" novalidate>
+        {% csrf_token %}
+        {% include 'includes/form_fields.html' %}
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">保存授权</button>
+            <a href="{% url 'rbac_user_list' %}" class="btn btn-default">取消</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

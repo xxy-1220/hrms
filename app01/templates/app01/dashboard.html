@@ -1,0 +1,176 @@
+{% extends 'app01/base.html' %}
+{% load rbac static %}
+<!--
+  ================================================================
+  页面：dashboard.html —— 首页概览（仪表盘）
+  对应任务书：T10 数据图表（ECharts）+ 各业务模块统计汇总
+  讲解要点（演示时照这个顺序讲）：
+   1. 进系统先看到最上面一排 4 张彩色统计卡片：部门总数、员工人数、今日考勤/异常、本月实发工资。
+   2. 中间是两张图：左边环形饼图看「各部门人数占比」，右边柱状图看「各月实发工资趋势」，鼠标悬停会弹出提示框。
+   3. 换成 staff01 登录，两张图会消失——因为图表区被 can_view_stats 权限判断包住了，只有统计权限才渲染。
+   4. 图表不是图片：页面加载后 JS 用 $.getJSON 请求 /stats/departments/ 和 /stats/salaries/ 拿 JSON 再交给 ECharts 画；
+      最下面两块是「最新公告」（置顶带红色小标签）与「待办任务」（级别带彩色标签）。
+-->
+
+{% block title %}首页 · 企业员工管理系统{% endblock %}
+
+{% block content %}
+<div class="page-header-box">
+    <div>
+        <h3>首页概览</h3>
+        <div class="sub">今天是 {{ today|date:'Y 年 m 月 d 日' }}，{{ current_month }} 薪资统计周期</div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-3 col-sm-6">
+        <div class="stat-card">
+            <div>
+                <div class="stat-label">部门总数</div>
+                <div class="stat-value">{{ department_count }}</div>
+            </div>
+            <div class="stat-icon bg-blue"><span class="glyphicon glyphicon-th-large"></span></div>
+        </div>
+    </div>
+    <div class="col-md-3 col-sm-6">
+        <div class="stat-card">
+            <div>
+                <div class="stat-label">员工人数</div>
+                <div class="stat-value">{{ employee_count }}</div>
+            </div>
+            <div class="stat-icon bg-teal"><span class="glyphicon glyphicon-user"></span></div>
+        </div>
+    </div>
+    <div class="col-md-3 col-sm-6">
+        <div class="stat-card">
+            <div>
+                <div class="stat-label">今日考勤 / 异常</div>
+                <div class="stat-value">{{ attendance_count }} / {{ abnormal_count }}</div>
+            </div>
+            <div class="stat-icon bg-orange"><span class="glyphicon glyphicon-time"></span></div>
+        </div>
+    </div>
+    <div class="col-md-3 col-sm-6">
+        <div class="stat-card">
+            <div>
+                <div class="stat-label">{{ current_month }} 实发工资</div>
+                <div class="stat-value">￥{{ month_salary|floatformat:2 }}</div>
+            </div>
+            <div class="stat-icon bg-purple"><span class="glyphicon glyphicon-yen"></span></div>
+        </div>
+    </div>
+</div>
+
+{% if can_view_stats %}
+<div class="row">
+    <div class="col-md-6">
+        <div class="panel-card">
+            <h4>部门人数分布</h4>
+            <div id="departmentChart" class="chart-box"></div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="panel-card">
+            <h4>各月薪资趋势</h4>
+            <div id="salaryChart" class="chart-box"></div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="row">
+    <div class="col-md-7">
+        <div class="panel-card">
+            <h4>最新公告</h4>
+            {% if announcements %}
+            <ul class="list-unstyled dashboard-list">
+                {% for item in announcements %}
+                <li>
+                    {% if item.is_top %}<span class="badge-soft status-absent">置顶</span>{% endif %}
+                    <a href="{% url 'announcement_list' %}">{{ item.title }}</a>
+                    <span class="text-muted small pull-right">{{ item.publish_time|date:'m-d H:i' }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <div class="empty-state">暂无公告</div>
+            {% endif %}
+        </div>
+    </div>
+    <div class="col-md-5">
+        <div class="panel-card">
+            <h4>待办任务</h4>
+            {% if tasks %}
+            <ul class="list-unstyled dashboard-list">
+                {% for task in tasks %}
+                <li>
+                    <span class="badge-soft level-{{ task.level }}">{{ task.get_level_display }}</span>
+                    {{ task.title }}
+                    <span class="text-muted small pull-right">{{ task.owner.name }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <div class="empty-state">暂无任务</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .dashboard-list li { padding: 9px 0; border-bottom: 1px dashed #eef1f5; }
+    .dashboard-list li:last-child { border-bottom: none; }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+{% if can_view_stats %}
+<script src="{% static 'vendor/echarts/echarts.min.js' %}"></script>
+<script>
+    $(function () {
+        var deptChart = echarts.init(document.getElementById('departmentChart'));
+        var salaryChart = echarts.init(document.getElementById('salaryChart'));
+
+        $.getJSON("{% url 'department_chart_data' %}", function (res) {
+            deptChart.setOption({
+                tooltip: {trigger: 'item', formatter: '{b}: {c} 人 ({d}%)'},
+                legend: {bottom: 0},
+                color: ['#337ab7', '#1abc9c', '#f39c12', '#8e6bd8', '#e74c3c', '#5b6fd6'],
+                series: [{
+                    name: '部门人数',
+                    type: 'pie',
+                    radius: ['38%', '66%'],
+                    center: ['50%', '45%'],
+                    avoidLabelOverlap: true,
+                    label: {show: true, formatter: '{b}\n{c} 人'},
+                    data: res.data
+                }]
+            });
+        });
+
+        $.getJSON("{% url 'salary_chart_data' %}", function (res) {
+            salaryChart.setOption({
+                tooltip: {trigger: 'axis', valueFormatter: function (v) { return '￥' + v.toFixed(2); }},
+                grid: {left: 60, right: 24, top: 24, bottom: 40},
+                xAxis: {type: 'category', data: res.labels, axisLabel: {rotate: res.labels.length > 8 ? 30 : 0}},
+                yAxis: {type: 'value', name: '实发工资（元）'},
+                series: [{
+                    name: '实发工资',
+                    type: 'bar',
+                    barMaxWidth: 38,
+                    itemStyle: {color: '#337ab7', borderRadius: [4, 4, 0, 0]},
+                    data: res.values
+                }]
+            });
+        });
+
+        window.addEventListener('resize', function () {
+            deptChart.resize();
+            salaryChart.resize();
+        });
+    });
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,23 @@
+<!--
+  ================================================================
+  片段：includes/form_fields.html —— 表单字段通用渲染片段
+  对应任务书：T2 / T3 / T6 / T7 / T8 / T5 各模块的新增与编辑表单共用
+  讲解要点（演示时照这个顺序讲）：
+   1. 浏览器里每个字段都是「标题 + 输入框/下拉框 + 灰色帮助文字」，必填字段标题后面有红色星号。
+   2. 故意不填必填项提交：整块字段变红，下面出现红色错误提示，已填的其他内容保留，不用重新输入。
+   3. 这里用 for 标签遍历表单的所有字段；field 直接输出就是对应的 input/select，Django 表单会按字段类型自动生成控件。
+   4. id_for_label 生成 label 的 for 属性，点标题就能聚焦到输入框；field.errors 保存该字段的校验错误列表。
+-->
+{% for field in form %}
+<div class="form-group {% if field.errors %}has-error{% endif %}">
+    <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span class="text-danger">*</span>{% endif %}</label>
+    {{ field }}
+    {% if field.help_text %}<span class="help-block">{{ field.help_text }}</span>{% endif %}
+    {% for error in field.errors %}<span class="help-block field-error">{{ error }}</span>{% endfor %}
+</div>
+{% endfor %}
+{% if form.non_field_errors %}
+<div class="alert alert-danger">
+    {% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}
+</div>
+{% endif %}

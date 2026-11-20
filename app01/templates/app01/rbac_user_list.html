@@ -1,0 +1,96 @@
+{% extends 'app01/base.html' %}
+{% load rbac %}
+<!--
+  ================================================================
+  页面：rbac_user_list.html —— 用户授权（账号列表）
+  对应任务书：T5 RBAC 权限管理（用户 - 角色 - 权限）
+  讲解要点（演示时照这个顺序讲）：
+   1. 浏览器里是一张账号表格：ID、用户名、姓名、所属部门、角色标签、启用/禁用状态、是否超级管理员、操作。
+   2. 「角色」列可能同时出现多个彩色标签，表示该账号被分配了多个角色；一个都没有时显示「未分配角色」。
+   3. 点行尾蓝色「分配角色」按钮进入编辑页，勾选角色和部门，保存后该账号下次请求就按新权限生效。
+   4. 右上角「角色权限管理」跳到角色列表维护权限；本页只有超级管理员能进，才有「分配角色」按钮。
+-->
+
+{% block title %}用户授权 · 企业员工管理系统{% endblock %}
+
+{% block content %}
+<div class="page-header-box">
+    <div>
+        <h3>用户授权</h3>
+        <div class="sub">为系统账号分配角色、所属部门与账号状态（仅超级管理员可操作）</div>
+    </div>
+    <a href="{% url 'rbac_role_list' %}" class="btn btn-default">
+        <span class="glyphicon glyphicon-key"></span> 角色权限管理
+    </a>
+</div>
+
+<form method="get" class="filter-bar form-inline">
+    <div class="form-group">
+        <input type="text" name="q" value="{{ keyword }}" class="form-control"
+               placeholder="按用户名 / 姓名 / 手机号搜索">
+    </div>
+    <button type="submit" class="btn btn-default">
+        <span class="glyphicon glyphicon-search"></span> 查询
+    </button>
+    {% if keyword %}
+    <a href="{% url 'rbac_user_list' %}" class="btn btn-link">重置</a>
+    {% endif %}
+</form>
+
+<div class="table-panel">
+    <table class="table table-hover">
+        <thead>
+        <tr>
+            <th style="width: 60px;">ID</th>
+            <th>用户名</th>
+            <th>姓名</th>
+            <th>所属部门</th>
+            <th>角色</th>
+            <th style="width: 80px;">状态</th>
+            <th style="width: 110px;">超级管理员</th>
+            <th style="width: 160px;">操作</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for item in page_obj %}
+        <tr>
+            <td>{{ item.id }}</td>
+            <td><strong>{{ item.username }}</strong></td>
+            <td>{{ item.last_name|default:'' }}{{ item.first_name|default:'' }}{% if not item.last_name and not item.first_name %}—{% endif %}</td>
+            <td>{{ item.depart.title|default:'未分配' }}</td>
+            <td>
+                {% for role in item.roles.all %}
+                <span class="badge-soft level-low">{{ role.name }}</span>
+                {% empty %}
+                <span class="text-muted">未分配角色</span>
+                {% endfor %}
+            </td>
+            <td>
+                {% if item.is_active %}
+                <span class="badge-soft status-normal">启用</span>
+                {% else %}
+                <span class="badge-soft status-absent">禁用</span>
+                {% endif %}
+            </td>
+            <td>
+                {% if item.is_super_admin or item.is_superuser %}
+                <span class="badge-soft status-late">是</span>
+                {% else %}
+                <span class="text-muted">否</span>
+                {% endif %}
+            </td>
+            <td>
+                {% has_perm_code request.user 'rbac:manage' as can_manage %}
+                {% if can_manage %}
+                <a href="{% url 'rbac_user_edit' item.id %}" class="btn btn-primary btn-action">分配角色</a>
+                {% endif %}
+            </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="8"><div class="empty-state">暂无用户</div></td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% include 'includes/pagination.html' %}
+</div>
+{% endblock %}

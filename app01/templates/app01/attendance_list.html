@@ -1,0 +1,89 @@
+{% extends 'app01/base.html' %}
+{% load rbac %}
+<!--
+  ================================================================
+  页面：attendance_list.html —— 考勤管理列表
+  对应任务书：T6 考勤管理（按姓名/日期筛选、状态自动判定、增删改查）
+  讲解要点（演示时照这个顺序讲）：
+   1. 浏览器里筛选区是「员工姓名输入框 + 日期选择器 + 查询按钮」，选某一天就只看当天的考勤。
+   2. 表格列依次是员工、部门、日期、上班时间、下班时间、状态、备注、操作；状态用彩色小标签显示（正常绿、迟到橙、早退红等）。
+   3. 指一下时间列：没打卡的显示「—」；状态不是手填的，后端按 09:00 上班、18:00 下班自动判定。
+   4. 行内编辑/删除按钮由权限控制，删除前弹确认框；表格底部是分页条。
+-->
+
+{% block title %}考勤管理 · 企业员工管理系统{% endblock %}
+
+{% block content %}
+<div class="page-header-box">
+    <div>
+        <h3>考勤管理</h3>
+        <div class="sub">考勤状态由上下班时间自动计算：09:00 上班，18:00 下班</div>
+    </div>
+    {% has_perm_code request.user 'attendance:add' as can_add %}
+    {% if can_add %}
+    <a href="{% url 'attendance_add' %}" class="btn btn-primary">
+        <span class="glyphicon glyphicon-plus"></span> 新增考勤
+    </a>
+    {% endif %}
+</div>
+
+<form method="get" class="filter-bar form-inline">
+    <div class="form-group">
+        <input type="text" name="q" value="{{ keyword }}" class="form-control" placeholder="按员工姓名搜索">
+    </div>
+    <div class="form-group">
+        <input type="date" name="date" value="{{ date }}" class="form-control">
+    </div>
+    <button type="submit" class="btn btn-default"><span class="glyphicon glyphicon-search"></span> 查询</button>
+    {% if keyword or date %}
+    <a href="{% url 'attendance_list' %}" class="btn btn-link">重置</a>
+    {% endif %}
+</form>
+
+<div class="table-panel">
+    <table class="table table-hover">
+        <thead>
+        <tr>
+            <th>员工</th>
+            <th>部门</th>
+            <th style="width: 110px;">日期</th>
+            <th style="width: 100px;">上班时间</th>
+            <th style="width: 100px;">下班时间</th>
+            <th style="width: 90px;">状态</th>
+            <th>备注</th>
+            <th style="width: 160px;">操作</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for item in page_obj %}
+        <tr>
+            <td><strong>{{ item.employee.name }}</strong></td>
+            <td>{{ item.employee.depart.title }}</td>
+            <td>{{ item.date|date:'Y-m-d' }}</td>
+            <td>{{ item.clock_in|time:'H:i'|default:'—' }}</td>
+            <td>{{ item.clock_out|time:'H:i'|default:'—' }}</td>
+            <td><span class="badge-soft status-{{ item.status }}">{{ item.get_status_display }}</span></td>
+            <td class="text-muted">{{ item.remark|default:'—' }}</td>
+            <td>
+                {% has_perm_code request.user 'attendance:edit' as can_edit %}
+                {% if can_edit %}
+                <a href="{% url 'attendance_edit' item.id %}" class="btn btn-default btn-action">编辑</a>
+                {% endif %}
+                {% has_perm_code request.user 'attendance:delete' as can_delete %}
+                {% if can_delete %}
+                <form method="post" action="{% url 'attendance_delete' item.id %}" class="inline-form"
+                      onsubmit="return confirm('确认删除该考勤记录吗？');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger btn-action">删除</button>
+                </form>
+                {% endif %}
+            </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="8"><div class="empty-state">暂无考勤记录</div></td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% include 'includes/pagination.html' %}
+</div>
+{% endblock %}
